@@ -1,41 +1,7 @@
 import argparse
+import json
 from obswebsocket import obsws, requests
 
-COMMANDTYPE_TO_FUNC = {}
-def command_to_action(command):
-    command = command.strip()
-    command = command.lower()
-    command = command.split(' ')
-    action_type = command[0]
-    if action_type in COMMANDTYPE_TO_FUNC:
-        return COMMANDTYPE_TO_FUNC[action_type](command)
-    else:
-        print('Invalid command: ' + action_type)
-        exit(1)
-
-def cmd_version(command):
-    def _ret(ws):
-        print(ws.call(requests.GetVersion()).getObsVersion())
-    return _ret
-COMMANDTYPE_TO_FUNC['version'] = cmd_version
-
-def cmd_set_source_filter_enabled(command):
-    def _ret(ws):
-        source_name = command[1]
-        filter_name = command[2]
-        filter_enabled = strtobool(command[3])
-        ws.call(requests.SetSourceFilterEnabled(sourceName=source_name, filterName=filter_name, filterEnabled=filter_enabled))
-    return _ret
-COMMANDTYPE_TO_FUNC['set_source_filter_enabled'] = cmd_set_source_filter_enabled
-
-def get_password(password_path):
-    with open(password_path, 'r') as file:
-        return file.read().strip()
-
-def strtobool(val):
-    if val is None: return False
-    return val.lower() not in ('n', 'no', 'f', 'false', 'off', '0', '')
-    
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--ip', help='IP address of the OBS server')
@@ -87,11 +53,16 @@ if __name__ == '__main__':
     if args.script is not None:
         with open(args.script, 'r') as file:
             command_list = file.readlines()
-
-    action_list = map(command_to_action, command_list)
-
+    
     ws = obsws(ip, port, password)
     ws.connect()
-    for action in action_list:
-        action(ws)
+    for command in command_list:
+        json_data = json.loads(command)
+        requestType = json_data['requestType']
+        requestFields = json_data.get('requestFields', {})
+        responseField = json_data.get('responseField', None)
+        request_call = getattr(requests, requestType)
+        response = ws.call(request_call(**requestFields))
+        if responseField is not None:
+            print(response.datain[responseField])
     ws.disconnect()
