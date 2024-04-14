@@ -1,0 +1,4 @@
+# (Get-Command python).Path
+# (Get-Command pip).Path
+
+pip install obs-websocket-py
